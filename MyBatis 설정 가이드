@@ -1,0 +1,165 @@
+1. 프로젝트 생성
+	new > Spring Legacy Project > 패키지 spring.mvc.member_mybatis
+	컨텍스트명 : 3번째 패키지명 member_mybatis = localhost:8080/member_mybatis
+
+******* 프로젝트 복사 시 프로젝트 우클릭 -> 속성 -> web project settings -> context root 수정
+충돌 : 톰캣 우클릭 > add and Remove 선택 > 충돌소스를 선택후 remove
+
+//빈번한 에러
+		server.init()에러 : jdbc not found - 톰캣 재설치 > context.xml에 컨넥션 풀 추가하기
+		또는 jdbc6.jar가 추가 안되어 있는 경우 해당 jar 추가 후 .m2 삭제 후 이클립스 실행 
+		
+2. src/main/java
+		controller	: MFrontController.java
+		domain		: MemberDTO.java --> MemberVO.java 
+		persistence	: MemberDAO, MemberDAOImpl
+		service		: MemberService, MemberServiceImpl
+		resources	: script.js, style.css
+		view		: member/~.jsp
+
+3. web.xml
+<!-- 한글 안깨지게 처리 시작-->
+	<filter>
+		<filter-name>encodingFilter</filter-name>
+		<filter-class>org.springframework.web.filter.CharacterEncodingFilter</filter-class>
+		<init-param>
+			<param-name>encoding</param-name>
+			<param-value>UTF-8</param-value>
+		</init-param>
+		<init-param>
+			<param-name>forceEncoding</param-name>
+			<param-value>true</param-value>
+		</init-param>
+	</filter>
+	
+	<filter-mapping>
+		<filter-name>encodingFilter</filter-name>
+		<url-pattern>/*</url-pattern>
+	</filter-mapping>
+	
+<!-- 한글 안깨지게 처리 종료 -->
+
+4. setting.jsp 에서 js, css, images 경로 수정
+	<c:set var="project" value="3번째 패키지명/resources/" />
+	
+5. 에러난 import 경로 수정(java, modifyView.jsp)
+
+6. 의존 설정 pom.xml에 추가 ... 등록된 jar파일들이 maven 빌드 도구를 통해 다운로드
+	
+	mybatis-spring, spring-jdbc, mybatis, spring-test 추가
+
+<!-- mybatis setting start -->
+		
+		<dependency>
+			<groupId>org.mybatis</groupId>
+			<artifactId>mybatis-spring</artifactId>
+			<version>1.3.1</version>
+		</dependency>
+		
+		<dependency>
+			<groupId>org.mybatis</groupId>
+			<artifactId>mybatis</artifactId>
+			<version>3.4.4</version>
+		</dependency>
+		
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-jdbc</artifactId>
+			<version>4.3.9.RELEASE</version>
+		</dependency>
+		
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-test</artifactId>
+			<version>4.3.9.RELEASE</version>
+		</dependency>
+		
+	<!-- mybatis setting end -->
+
+7. servlet-context.xml
+	경로 - src/main/webapp(기본) / webINF / spring / appservlet / servlet-context.xml
+		dataSource, sqlSessionFactory, sqlSession 추가
+	
+	<!-- MyBatis 설정 시작 -->
+	<!-- 컨넥션 풀 : 서버 > context.xml -->
+	<beans:bean name="dataSource" class="org.springframework.jndi.JndiObjectFactoryBean">
+		<beans:property name="jndiName" value="java:comp/env/jdbc/Oracle11g" />
+		<beans:property name="resourceRef" value="true" />
+	</beans:bean>
+	
+	<beans:bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+		<beans:property name="dataSource" ref="dataSource" /> <!-- 컨넥션 풀 호출 -->
+		<beans:property name="mapperLocations" value="classPath:member_mybatis/mapper/*.xml" /> <!-- MyBatis구현 -->
+	</beans:bean>
+	
+	<beans:bean id="sqlSession" class="org.mybatis.spring.SqlSessionTemplate">
+		<beans:constructor-arg index="0" ref="sqlSessionFactory"/>
+	</beans:bean>
+	
+	<!-- MyBatis 설정 종료 -->	
+ 
+<!-- 
+	컨넥션 풀
+    <Resource auth="Container"
+    	driverClassName="oracle.jdbc.driver.OracleDriver"
+    	maxTotal="50"
+		maxWaitMillis="1000"
+		name="jdbc/Oracle11g"
+    	username="jsp"
+    	password="tiger"
+    	type="javax.sql.DataSource"
+    	url="jdbc:oracle:thin:@localhost:1521:xe"
+-->		
+
+8. MemberMapper 작성
+	경로 : src/main/resources 폴더 내 member_mybatis/mapper/
+	
+	new > other > xml file > memberMapper.xml
+	
+	<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	
+	<== http://mybatis.org > products 선택 > 왼쪽 Mybatis3 선택
+
+9. 
+
+	9-1. Controller 수정
+		@Controller
+			public class MFrontController {
+		
+				@Inject				//@Autowired
+				MemberServiceImpl service;
+	
+	9-2. Service 수정
+		@Service
+		public class MemberServiceImpl implements MemberService {
+		
+			@Inject			//@Autowired
+			MemberDAO dao;
+
+	9-3. MemberDAOImpl 수정
+
+		//저장소
+		@Repository
+		public class MemberDAOImpl implements MemberDAO{
+			
+			//객체주입
+			@Inject
+			private SqlSession sqlSession; //sqlSession: 참조변수
+			
+			//중복확인
+			@Override
+			public int idCheck(String strId) {
+				
+				int cnt = 0;
+				
+				//입력받은 id가 DB에 존재하면 cnt:1, 즉 id 중복, 존재하지 않으면 cnt:0
+				//sqlSession.selectOne("패키지명.인터페이스명.메소드", 매개변수(파라미터);
+				cnt = sqlSession.selectOne("spring.mvc.member_mybatis.persistence.MemberDAO.idCheck", strId);
+				
+				return cnt;
+				
+			}	
+	
+		
